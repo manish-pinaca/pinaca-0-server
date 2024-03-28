@@ -8,6 +8,7 @@ module.exports.saveAll = async (req, res) => {
 
     return res.json({ message: "Customers details saved successfully" });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ message: "Error saving customers details" });
   }
 };
@@ -24,6 +25,7 @@ module.exports.getAll = async (req, res) => {
 
     res.json({ customers, page: Number(page), totalCustomers });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error retrieving customers details" });
   }
 };
