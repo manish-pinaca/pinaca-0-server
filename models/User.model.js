@@ -1,11 +1,7 @@
 const { model, Schema } = require("mongoose");
 
 const userSchema = new Schema({
-  userId: {
-    type: String,
-    required: true,
-    unique: true,
-  },
+  name: { type: String, required: true },
   email: {
     type: String,
     required: true,
@@ -15,6 +11,8 @@ const userSchema = new Schema({
     type: String,
     required: true,
   },
+  notifications: { type: Array },
+  requestedServices: { type: Array },
 });
 
 const User = model("User", userSchema);

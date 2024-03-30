@@ -31,3 +31,16 @@ module.exports.getAll = async (req, res) => {
     return res.status(500).json({ error: "Error getting services" });
   }
 };
+
+module.exports.getService = async (req, res) => {
+  try {
+    const { serviceId } = req.params;
+
+    const service = await ServiceModel.findById(serviceId, { __v: 0 });
+
+    return res.status(200).json(service);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Error getting service" });
+  }
+};
