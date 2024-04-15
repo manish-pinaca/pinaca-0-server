@@ -1,6 +1,7 @@
 require("dotenv").config();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const PDFDocument = require("pdfkit");
 
 const User = require("../models/User.model");
 const Customer = require("../models/Customer.model");
@@ -28,7 +29,7 @@ module.exports.register = async (req, res) => {
     const hashedPassword = bcrypt.hashSync(password, salt);
 
     const newUser = new Customer({
-      customerEmail: email,
+      userEmail: email,
       customerName: userName,
       password: hashedPassword,
     });
@@ -76,7 +77,7 @@ module.exports.login = async (req, res) => {
 
     // Find user
     if (role === "admin") user = await User.findOne({ email });
-    else user = await Customer.findOne({ customerEmail: email });
+    else user = await Customer.findOne({ userEmail: email });
 
     // Check if user exists
     if (!user) {
@@ -110,7 +111,7 @@ module.exports.login = async (req, res) => {
         role,
         user: {
           _id: user._id,
-          customerEmail: user.customerEmail,
+          customerEmail: user.userEmail,
           customerName: user.customerName,
           pendingServices: user.pendingServices,
           activeServices: user.activeServices,
@@ -164,7 +165,7 @@ module.exports.getUserData = async (req, res) => {
       return res.status(200).json({
         user: {
           _id: user._id,
-          customerEmail: user.customerEmail,
+          customerEmail: user.userEmail,
           customerName: user.customerName,
           pendingServices: user.pendingServices,
           activeServices: user.activeServices,
@@ -215,10 +216,6 @@ module.exports.addPendingService = async (customerId, serviceId, adminId) => {
 };
 
 module.exports.removePendingService = async (customerId, serviceId) => {
-  console.log(
-    "🚀 ~ file: auth.controller.js:218 ~ module.exports.removePendingService= ~ serviceId:",
-    serviceId
-  );
   try {
     const customer = await Customer.findById(customerId);
 
@@ -281,5 +278,33 @@ module.exports.removeRequestedService = async (
   } catch (error) {
     console.log(error);
     throw new Error("Couldn't remove service from requestedService list");
+  }
+};
+
+module.exports.downloadReport = async (req, res) => {
+  try {
+    console.log("download report", req.params);
+    const doc = new PDFDocument({ size: "A4", margin: 10 });
+
+    // Set response headers for PDF download
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=example.pdf");
+
+    const { customerId, serviceId } = req.params;
+
+    const customer = await Customer.findById(customerId);
+
+    const service = await Service.findById(serviceId);
+
+    doc.pipe(res);
+    doc.fontSize(24);
+    doc.font("Times-Roman");
+    doc.text("Customer Name: " + customer.customerName);
+    doc.text("Service Name: " + service.service);
+
+    doc.end();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error generating report" });
   }
 };
