@@ -294,6 +294,12 @@ module.exports.downloadReport = async (req, res) => {
 
     const customer = await Customer.findById(customerId);
 
+    if (!customer.activeServices.includes(serviceId)) {
+      return res.status(400).json({
+        message: "Service is not active.",
+      });
+    }
+
     const service = await Service.findById(serviceId);
 
     doc.pipe(res);
@@ -305,6 +311,6 @@ module.exports.downloadReport = async (req, res) => {
     doc.end();
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Error generating report" });
+    res.status(500).json({ message: "Error generating report" });
   }
 };

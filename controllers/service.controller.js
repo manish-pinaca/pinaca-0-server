@@ -15,7 +15,13 @@ module.exports.saveAll = async (req, res) => {
 
 module.exports.getAll = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page, limit } = req.query;
+
+    if (!(page && limit)) {
+      const services = await ServiceModel.find({}, { __v: 0 });
+
+      return res.status(200).json({ services });
+    }
 
     const services = await ServiceModel.find()
       .skip((page - 1) * limit)
