@@ -34,3 +34,36 @@ module.exports.getAll = async (req, res) => {
     res.status(500).json({ message: "Error retrieving customers details" });
   }
 };
+
+module.exports.getAllActiveCustomers = async (req, res) => {
+  try {
+    const customers = await Customer.find({}, { __v: 0, password: 0 });
+    const updatedCustomers = [];
+
+    customers.forEach((customer) => {
+      if (customer.activeServices.length === 0) {
+        updatedCustomers.push({
+          _id: customer._id,
+          customerName: customer.customerName,
+          userEmail: customer.userEmail,
+          adminId: customer.adminId,
+          activeService: "",
+        });
+      } else {
+        customer.activeServices.forEach((service) => {
+          updatedCustomers.push({
+            _id: customer._id,
+            customerName: customer.customerName,
+            userEmail: customer.userEmail,
+            adminId: customer.adminId,
+            activeService: service,
+          });
+        });
+      }
+    });
+
+    return res.status(200).json({ customers: updatedCustomers });
+  } catch (error) {
+    res.status(500).json({ message: "Error retrieving customers details" });
+  }
+}
