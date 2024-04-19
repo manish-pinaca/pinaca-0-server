@@ -291,22 +291,75 @@ module.exports.downloadReport = async (req, res) => {
     res.setHeader("Content-Disposition", "attachment; filename=example.pdf");
 
     const { customerId, serviceId } = req.params;
-
-    const customer = await Customer.findById(customerId);
-
-    if (!customer.activeServices.includes(serviceId)) {
-      return res.status(400).json({
-        message: "Service is not active.",
-      });
-    }
-
-    const service = await Service.findById(serviceId);
-
     doc.pipe(res);
-    doc.fontSize(24);
-    doc.font("Times-Roman");
-    doc.text("Customer Name: " + customer.customerName);
-    doc.text("Service Name: " + service.service);
+    if (customerId !== "all" && serviceId !== "all") {
+      const customer = await Customer.findById(customerId);
+
+      if (!customer.activeServices.includes(serviceId)) {
+        return res.status(400).json({
+          message: "Service is not active.",
+        });
+      }
+
+      const service = await Service.findById(serviceId);
+
+      doc.fontSize(24);
+      doc.font("Times-Roman");
+      doc.text("Customer Name: " + customer.customerName);
+      doc.text("Service Name: " + service.service);
+    } else if (customerId === "all" && serviceId !== "all") {
+      const customers = await Customer.find();
+      const filteredCustomers = customers.filter((customer) =>
+        customer.activeServices.includes(serviceId)
+      );
+      if (filteredCustomers.length === 0) {
+        return res.status(400).json({
+          message: "Service is not active.",
+        });
+      }
+      const service = await Service.findById(serviceId);
+      const tableData = filteredCustomers.map((customer) => [
+        customer.customerName,
+        service.service,
+        "dd/mm/yyyy",
+      ]);
+      drawTable(doc, tableData);
+    } else if (customerId !== "all" && serviceId === "all") {
+      const customer = await Customer.findById(customerId);
+      const activeServices = [];
+      for (let i = 0; i < customer.activeServices.length; i++) {
+        const service = await Service.findById(customer.activeServices[i]);
+        activeServices.push(service.service);
+      }
+      const tableData = activeServices.map(service => [customer.customerName, service, "dd/mm/yyyy"])
+
+      drawTable(doc, tableData);
+    } else {
+      const customers = await Customer.find();
+      const updatedCustomers = [];
+      customers.forEach((customer) => {
+        if (customer.activeServices.length === 0) {
+          updatedCustomers.push([customer.customerName, "", ""]);
+        }
+        else {
+          for (let i = 0; i < customer.activeServices.length; i++) {
+            updatedCustomers.push([customer.customerName, customer.activeServices[i], "dd/mm/yyyy"]);
+          }
+        }
+      })
+      const tableData = [];
+      for (let i = 0; i < updatedCustomers.length; i++) {
+        if (!updatedCustomers[i][1]) {
+          tableData.push([updatedCustomers[i][0], "-", "-"])
+        }
+        else {
+          const service = await Service.findById(updatedCustomers[i][1]);
+          tableData.push([updatedCustomers[i][0], service.service, "dd/mm/yyyy"])
+        }
+      }
+
+      drawTable(doc, tableData);
+    }
 
     doc.end();
   } catch (error) {
@@ -314,3 +367,40 @@ module.exports.downloadReport = async (req, res) => {
     res.status(500).json({ message: "Error generating report" });
   }
 };
+
+function drawTable(doc, data) {
+  // Calculate the maximum number of rows that fit on a page
+  const maxRowsPerPage = 30; // Adjust according to your requirement
+  const rowsPerPage = maxRowsPerPage - 1; // Reserve space for header row
+  const numberOfPages = Math.ceil(data.length / rowsPerPage);
+
+  function addRows(pageIndex) {
+    const startIndex = pageIndex * rowsPerPage;
+    const endIndex = Math.min((pageIndex + 1) * rowsPerPage, data.length);
+
+    // Add header row
+    doc.font("Helvetica-Bold").fontSize(12);
+    doc.text("Customer", 30, 50);
+    doc.text("Service", 300, 50);
+    doc.text("Start Date", 500, 50);
+    // Add rows
+    doc.font("Helvetica").fontSize(10);
+    let y = 70;
+    for (let i = startIndex; i < endIndex; i++) {
+      const rowData = data[i];
+      if (!rowData) continue; // Skip empty rows
+      doc.text(rowData[0], 30, y);
+      doc.text(rowData[1], 300, y);
+      doc.text(rowData[2], 500, y);
+      y += 20;
+    }
+  }
+
+  // Add rows for each page
+  for (let pageIndex = 0; pageIndex < numberOfPages; pageIndex++) {
+    if (pageIndex > 0) {
+      doc.addPage();
+    }
+    addRows(pageIndex);
+  }
+}
