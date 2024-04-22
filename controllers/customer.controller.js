@@ -67,3 +67,16 @@ module.exports.getAllActiveCustomers = async (req, res) => {
     res.status(500).json({ message: "Error retrieving customers details" });
   }
 }
+
+module.exports.getCustomerName = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+
+    const customer = await Customer.findById(customerId, { __v: 0, password: 0 });
+
+    return res.status(200).json({ customerName: customer.customerName });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error retrieving customers details" });
+  }
+}
