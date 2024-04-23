@@ -9,9 +9,30 @@ const customerSchema = new Schema({
     required: true,
   },
   password: { type: String, required: true },
-  activeServices: [{ type: String }],
-  pendingServices: [{ type: String }],
-  rejectedServices: [{ type: String }],
+  activeServices: [
+    {
+      _id: false,
+      serviceId: { type: String },
+      serviceName: { type: String },
+      activateOn: { type: String },
+    },
+  ],
+  pendingServices: [
+    {
+      _id: false,
+      serviceId: { type: String },
+      serviceName: { type: String },
+      requestedOn: { type: String },
+    },
+  ],
+  rejectedServices: [
+    {
+      _id: false,
+      serviceId: { type: String },
+      serviceName: { type: String },
+      rejectedOn: { type: String },
+    },
+  ]
 });
 
 const Customer = model("Customer", customerSchema);

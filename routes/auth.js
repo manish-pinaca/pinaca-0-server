@@ -5,7 +5,7 @@ const {
   login,
   getUserData,
   downloadReport,
-  getReports
+  getReports,
 } = require("../controllers/auth.controller");
 
 const authRouter = Router();

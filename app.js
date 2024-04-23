@@ -7,6 +7,7 @@ const connectionToDatabase = require("./lib/db");
 const authRouter = require("./routes/auth");
 const customerRouter = require("./routes/customer");
 const serviceRouter = require("./routes/services");
+const feedbackRouter = require("./routes/feedback");
 const {
   addPendingService,
   removePendingService,
@@ -33,11 +34,13 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-app.use("/api", authRouter);
+app.use("/api/auth", authRouter);
 
 app.use("/api/customer", customerRouter);
 
 app.use("/api/services", serviceRouter);
+
+app.use("/api/feedback", feedbackRouter);
 
 server.listen(port, async () => {
   try {

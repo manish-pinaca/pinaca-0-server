@@ -12,7 +12,16 @@ const userSchema = new Schema({
     required: true,
   },
   notifications: { type: Array },
-  requestedServices: { type: Array },
+  requestedServices: [
+    {
+      _id: false,
+      serviceId: { type: String },
+      serviceName: { type: String },
+      customerId: { type: String },
+      customerName: { type: String },
+      requestedOn: { type: String },
+    },
+  ],
 });
 
 const User = model("User", userSchema);

@@ -2,6 +2,7 @@ require("dotenv").config();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const PDFDocument = require("pdfkit");
+const moment = require("moment");
 
 const User = require("../models/User.model");
 const Customer = require("../models/Customer.model");
@@ -191,6 +192,8 @@ module.exports.addPendingService = async (customerId, serviceId, adminId) => {
     if (!admin.notifications) admin.notifications = [];
     if (!admin.requestedServices) admin.requestedServices = [];
 
+    const requestedTime = new Date().toUTCString();
+
     admin.notifications.push({
       customerName: customer.customerName,
       serviceName: service.service,
@@ -198,15 +201,20 @@ module.exports.addPendingService = async (customerId, serviceId, adminId) => {
     });
 
     admin.requestedServices.push({
+      serviceId,
       customerId,
       customerName: customer.customerName,
-      serviceId,
       serviceName: service.service,
+      requestedOn: requestedTime,
     });
 
     await User.findByIdAndUpdate(adminId, admin);
 
-    customer.pendingServices.push(serviceId);
+    customer.pendingServices.push({
+      serviceId,
+      serviceName: service.service,
+      requestedOn: requestedTime,
+    });
 
     return await Customer.findByIdAndUpdate(customerId, customer);
   } catch (error) {
@@ -219,14 +227,9 @@ module.exports.removePendingService = async (customerId, serviceId) => {
   try {
     const customer = await Customer.findById(customerId);
 
-    console.log(customer.pendingServices, "pending services:");
-
     customer.pendingServices = customer.pendingServices.filter((service) => {
-      console.log("service: ", service, "serviceId: ", serviceId);
-      return service !== serviceId;
+      return service.serviceId !== serviceId;
     });
-
-    console.log(customer.pendingServices, "pending services:");
 
     await Customer.findByIdAndUpdate(customerId, {
       $set: { pendingServices: customer.pendingServices },
@@ -241,7 +244,15 @@ module.exports.addActiveService = async (customerId, serviceId) => {
   try {
     const customer = await Customer.findById(customerId);
 
-    customer.activeServices.push(serviceId);
+    const service = await Service.findById(serviceId);
+
+    const acceptTime = new Date().toUTCString();
+
+    customer.activeServices.push({
+      serviceId,
+      serviceName: service.service,
+      activateOn: acceptTime,
+    });
 
     return await Customer.findByIdAndUpdate(customerId, customer);
   } catch (error) {
@@ -253,7 +264,13 @@ module.exports.addRejectedService = async (customerId, serviceId) => {
   try {
     const customer = await Customer.findById(customerId);
 
-    customer.rejectedServices.push(serviceId);
+    const service = await Service.findById(serviceId);
+
+    customer.rejectedServices.push({
+      serviceId,
+      serviceName: service.service,
+      rejectedOn: new Date().toUTCString(),
+    });
 
     return await Customer.findByIdAndUpdate(customerId, customer);
   } catch (error) {
@@ -294,83 +311,102 @@ module.exports.downloadReport = async (req, res) => {
     if (customerId !== "all" && serviceId !== "all") {
       const customer = await Customer.findById(customerId);
 
-      if (!customer.activeServices.includes(serviceId)) {
+      const filteredService = customer.activeServices.filter(
+        (service) => service.serviceId === serviceId
+      );
+
+      if (!filteredService.length) {
         return res.status(400).json({
           message: "Service is not active.",
         });
       }
 
-      const service = await Service.findById(serviceId);
+      const tableData = [
+        customer.customerName,
+        filteredService[0].serviceName,
+        moment(
+          filteredService[0].activateOn !== "DD/MM/YYYY"
+            ? filteredService[0].activateOn
+            : "01/01/2022"
+        ).format("L"),
+      ];
 
-      doc.fontSize(24);
-      doc.font("Times-Roman");
-      doc.text("Customer Name: " + customer.customerName);
-      doc.text("Service Name: " + service.service);
+      drawTable(doc, [tableData]);
     } else if (customerId === "all" && serviceId !== "all") {
       const customers = await Customer.find();
-      const filteredCustomers = customers.filter((customer) =>
-        customer.activeServices.includes(serviceId)
+
+      const filteredCustomers = customers.filter(
+        (customer) =>
+          customer.activeServices.filter(
+            (service) => service.serviceId === serviceId
+          ).length > 0
       );
+
       if (filteredCustomers.length === 0) {
         return res.status(400).json({
           message: "Service is not active.",
         });
       }
-      const service = await Service.findById(serviceId);
-      const tableData = filteredCustomers.map((customer) => [
-        customer.customerName,
-        service.service,
-        "dd/mm/yyyy",
-      ]);
+
+      const tableData = filteredCustomers.map((customer) => {
+        const filteredService = customer.activeServices.filter(
+          (service) => service.serviceId === serviceId
+        )[0];
+
+        return [
+          customer.customerName,
+          filteredService.serviceName,
+          moment(
+            filteredService.activateOn !== "DD/MM/YYYY"
+              ? filteredService.activateOn
+              : "01/01/2022"
+          ).format("L"),
+        ];
+      });
+
       drawTable(doc, tableData);
     } else if (customerId !== "all" && serviceId === "all") {
       const customer = await Customer.findById(customerId);
+
       if (customer.activeServices.length === 0) {
         return res.status(400).json({
           message: "Service is not active.",
         });
       }
-      const activeServices = [];
-      for (let i = 0; i < customer.activeServices.length; i++) {
-        const service = await Service.findById(customer.activeServices[i]);
-        activeServices.push(service.service);
-      }
-      const tableData = activeServices.map((service) => [
+
+      const tableData = customer.activeServices.map((service) => [
         customer.customerName,
-        service,
-        "dd/mm/yyyy",
+        service.serviceName,
+        moment(
+          service.activateOn !== "DD/MM/YYYY"
+            ? service.activateOn
+            : "01/01/2022"
+        ).format("L"),
       ]);
 
       drawTable(doc, tableData);
     } else {
       const customers = await Customer.find();
-      const updatedCustomers = [];
+
+      const tableData = [];
+
       customers.forEach((customer) => {
         if (customer.activeServices.length === 0) {
-          updatedCustomers.push([customer.customerName, "", ""]);
+          tableData.push([customer.customerName, "-", "-"]);
         } else {
           for (let i = 0; i < customer.activeServices.length; i++) {
-            updatedCustomers.push([
+            tableData.push([
               customer.customerName,
-              customer.activeServices[i],
-              "dd/mm/yyyy",
+              customer.activeServices[i].serviceName,
+              moment(
+                customer.activeServices[i].activateOn !== "DD/MM/YYYY"
+                  ? customer.activeServices[i].activateOn
+                  : "01/01/2022"
+              ).format("L"),
             ]);
           }
         }
       });
-      const tableData = [];
-      for (let i = 0; i < updatedCustomers.length; i++) {
-        if (!updatedCustomers[i][1]) {
-          tableData.push([updatedCustomers[i][0], "-", "-"]);
-        } else {
-          const service = await Service.findById(updatedCustomers[i][1]);
-          tableData.push([
-            updatedCustomers[i][0],
-            service.service,
-            "dd/mm/yyyy",
-          ]);
-        }
-      }
 
       drawTable(doc, tableData);
     }
@@ -431,70 +467,94 @@ module.exports.getReports = async (req, res) => {
     if (customerId !== "all" && serviceId !== "all") {
       const customer = await Customer.findById(customerId);
 
-      if (!customer.activeServices.includes(serviceId)) {
+      const filteredService = customer.activeServices.filter(
+        (service) => service.serviceId === serviceId
+      );
+
+      if (!filteredService.length) {
         return res.status(400).json({
           message: "Customer has not activated the selected service.",
         });
       }
 
-      return res
-        .status(200)
-        .json([{ customerId, serviceId, activateDate: "DD/MM/YYYY" }]);
+      return res.status(200).json([
+        {
+          customerId,
+          customerName: customer.customerName,
+          serviceId,
+          serviceName: filteredService[0].serviceName,
+          activateOn: filteredService[0].activateOn,
+        },
+      ]);
     } else if (customerId === "all" && serviceId !== "all") {
       const customers = await Customer.find();
-      const filteredCustomers = customers.filter((customer) =>
-        customer.activeServices.includes(serviceId)
+
+      const filteredCustomers = customers.filter(
+        (customer) =>
+          customer.activeServices.filter(
+            (service) => service.serviceId === serviceId
+          ).length > 0
       );
+
       if (filteredCustomers.length === 0) {
         return res.status(400).json({
           message: "None of the customers have activated the selected service.",
         });
       }
-      const service = await Service.findById(serviceId);
+
       const data = filteredCustomers.map((customer) => {
+        const filteredService = customer.activeServices.filter(
+          (service) => service.serviceId === serviceId
+        )[0];
+
         return {
           customerId: customer._id,
-          serviceId: service._id,
-          activateDate: "DD/MM/YYYY",
+          customerName: customer.customerName,
+          serviceId: filteredService.serviceId,
+          serviceName: filteredService.serviceName,
+          activateOn: filteredService.activateOn,
         };
       });
       return res.status(200).json(data);
     } else if (customerId !== "all" && serviceId === "all") {
       const customer = await Customer.findById(customerId);
+
       if (customer.activeServices.length === 0) {
         return res.status(400).json({
           message: "Customer does not have any active service.",
         });
       }
+
       const data = customer.activeServices.map((service) => {
         return {
           customerId,
-          serviceId: service,
-          activateDate: "DD/MM/YYYY",
+          customerName: customer.customerName,
+          serviceId: service.serviceId,
+          serviceName: service.serviceName,
+          activateOn: service.activateOn,
         };
       });
+
       return res.status(200).json(data);
     } else {
       const customers = await Customer.find();
-      const updatedCustomers = [];
+
+      const data = [];
+
       customers.forEach((customer) => {
         if (customer.activeServices.length > 0) {
           for (let i = 0; i < customer.activeServices.length; i++) {
-            updatedCustomers.push({
+            data.push({
               customerId: customer._id,
-              serviceId: customer.activeServices[i],
-              activateDate: "DD/MM/YYYY",
+              customerName: customer.customerName,
+              serviceId: customer.activeServices[i].serviceId,
+              serviceName: customer.activeServices[i].serviceName,
+              activateOn: customer.activeServices[i].activateOn,
             });
           }
         }
       });
-      const data = updatedCustomers.map((customer) => {
-        return {
-          customerId: customer.customerId,
-          serviceId: customer.serviceId,
-          activateDate: "DD/MM/YYYY",
-        };
-      });
+
       return res.status(200).json(data);
     }
   } catch (error) {

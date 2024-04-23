@@ -50,3 +50,16 @@ module.exports.getService = async (req, res) => {
     return res.status(500).json({ error: "Error getting service" });
   }
 };
+
+module.exports.addService = async (req, res) => {
+  try {
+    const { service } = req.body;
+
+    const response = await ServiceModel.create({ service });
+
+    return res.json({ message: "Service saved successfully" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error saving service details" });
+  }
+};
