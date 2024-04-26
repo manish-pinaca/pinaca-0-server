@@ -11,7 +11,6 @@ const userSchema = new Schema({
     type: String,
     required: true,
   },
-  notifications: { type: Array },
   requestedServices: [
     {
       _id: false,

@@ -7,6 +7,7 @@ const moment = require("moment");
 const User = require("../models/User.model");
 const Customer = require("../models/Customer.model");
 const Service = require("../models/Service.model");
+const NotificationModel = require("../models/Notification.model");
 const { capitalizeFirstLetter } = require("../lib/utils");
 
 /**
@@ -189,16 +190,23 @@ module.exports.addPendingService = async (customerId, serviceId, adminId) => {
 
     const customer = await Customer.findById(customerId);
 
-    if (!admin.notifications) admin.notifications = [];
     if (!admin.requestedServices) admin.requestedServices = [];
 
     const requestedTime = new Date().toUTCString();
 
-    admin.notifications.push({
-      customerName: customer.customerName,
-      serviceName: service.service,
-      action: "requested",
+    const newNotification = new NotificationModel({
+      message: `${customer.customerName} has requested activation of ${service.service}.`,
+      type: "ADD_SERVICE_REQUEST",
+      sendBy: customerId,
+      sendTo: [
+        {
+          receiverId: adminId,
+          seen: false,
+        },
+      ],
     });
+
+    await newNotification.save();
 
     admin.requestedServices.push({
       serviceId,
@@ -298,6 +306,7 @@ module.exports.removeRequestedService = async (
   }
 };
 
+/*
 module.exports.downloadReport = async (req, res) => {
   try {
     const doc = new PDFDocument({ size: "A4", margin: 10 });
@@ -417,6 +426,7 @@ module.exports.downloadReport = async (req, res) => {
     res.status(500).json({ message: "Error generating report" });
   }
 };
+*/
 
 function drawTable(doc, data) {
   // Calculate the maximum number of rows that fit on a page
@@ -467,71 +477,76 @@ module.exports.getReports = async (req, res) => {
     if (customerId !== "all" && serviceId !== "all") {
       const customer = await Customer.findById(customerId);
 
-      const filteredService = customer.activeServices.filter(
-        (service) => service.serviceId === serviceId
-      );
+      const filteredReports = customer.reports
+        ? customer.reports.filter((report) => report.serviceId === serviceId)
+        : [];
 
-      if (!filteredService.length) {
+      if (!filteredReports.length) {
         return res.status(400).json({
-          message: "Customer has not activated the selected service.",
+          message: "No reports found for service",
         });
       }
 
-      return res.status(200).json([
-        {
+      const data = filteredReports.map((report) => {
+        return {
           customerId,
           customerName: customer.customerName,
-          serviceId,
-          serviceName: filteredService[0].serviceName,
-          activateOn: filteredService[0].activateOn,
-        },
-      ]);
+          serviceId: report.serviceId,
+          serviceName: report.serviceName,
+          generatedOn: report.generatedOn,
+          awsReportKey: report.awsReportKey,
+        };
+      });
+
+      return res.status(200).json(data);
     } else if (customerId === "all" && serviceId !== "all") {
       const customers = await Customer.find();
 
       const filteredCustomers = customers.filter(
         (customer) =>
-          customer.activeServices.filter(
-            (service) => service.serviceId === serviceId
-          ).length > 0
+          customer.reports?.filter((report) => report.serviceId === serviceId)
+            .length > 0
       );
 
       if (filteredCustomers.length === 0) {
         return res.status(400).json({
-          message: "None of the customers have activated the selected service.",
+          message: "No reports found for service",
         });
       }
 
-      const data = filteredCustomers.map((customer) => {
-        const filteredService = customer.activeServices.filter(
-          (service) => service.serviceId === serviceId
-        )[0];
+      const data = [];
 
-        return {
-          customerId: customer._id,
-          customerName: customer.customerName,
-          serviceId: filteredService.serviceId,
-          serviceName: filteredService.serviceName,
-          activateOn: filteredService.activateOn,
-        };
+      filteredCustomers.forEach((customer) => {
+        customer.reports.forEach((report) => {
+          if (report.serviceId === serviceId)
+            data.push({
+              customerId: customer._id,
+              customerName: customer.customerName,
+              serviceId: report.serviceId,
+              serviceName: report.serviceName,
+              awsReportKey: report.awsReportKey,
+              generatedOn: report.generatedOn,
+            });
+        });
       });
       return res.status(200).json(data);
     } else if (customerId !== "all" && serviceId === "all") {
       const customer = await Customer.findById(customerId);
 
-      if (customer.activeServices.length === 0) {
+      if (customer.reports?.length === 0) {
         return res.status(400).json({
-          message: "Customer does not have any active service.",
+          message: "No reports found",
         });
       }
 
-      const data = customer.activeServices.map((service) => {
+      const data = customer.reports.map((report) => {
         return {
           customerId,
           customerName: customer.customerName,
-          serviceId: service.serviceId,
-          serviceName: service.serviceName,
-          activateOn: service.activateOn,
+          serviceId: report.serviceId,
+          serviceName: report.serviceName,
+          generatedOn: report.generatedOn,
+          awsReportKey: report.awsReportKey,
         };
       });
 
@@ -542,17 +557,16 @@ module.exports.getReports = async (req, res) => {
       const data = [];
 
       customers.forEach((customer) => {
-        if (customer.activeServices.length > 0) {
-          for (let i = 0; i < customer.activeServices.length; i++) {
-            data.push({
-              customerId: customer._id,
-              customerName: customer.customerName,
-              serviceId: customer.activeServices[i].serviceId,
-              serviceName: customer.activeServices[i].serviceName,
-              activateOn: customer.activeServices[i].activateOn,
-            });
-          }
-        }
+        customer.reports?.forEach((report) => {
+          data.push({
+            customerId: customer._id,
+            customerName: customer.customerName,
+            serviceId: report.serviceId,
+            serviceName: report.serviceName,
+            awsReportKey: report.awsReportKey,
+            generatedOn: report.generatedOn,
+          });
+        });
       });
 
       return res.status(200).json(data);

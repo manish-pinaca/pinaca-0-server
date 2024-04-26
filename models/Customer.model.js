@@ -32,7 +32,16 @@ const customerSchema = new Schema({
       serviceName: { type: String },
       rejectedOn: { type: String },
     },
-  ]
+  ],
+  reports: [
+    {
+      _id: false,
+      serviceId: { type: String },
+      serviceName: { type: String },
+      generatedOn: { type: String },
+      awsReportKey: { type: String },
+    },
+  ],
 });
 
 const Customer = model("Customer", customerSchema);

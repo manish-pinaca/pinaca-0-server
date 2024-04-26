@@ -2,12 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
+const bodyParser = require("body-parser");
 
 const connectionToDatabase = require("./lib/db");
 const authRouter = require("./routes/auth");
 const customerRouter = require("./routes/customer");
 const serviceRouter = require("./routes/services");
 const feedbackRouter = require("./routes/feedback");
+const notificationRouter = require("./routes/notification");
 const {
   addPendingService,
   removePendingService,
@@ -17,11 +19,14 @@ const {
 } = require("./controllers/auth.controller");
 
 const port = process.env.PORT || 5000;
+
 const app = express();
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 const server = http.createServer(app);
 
@@ -41,6 +46,8 @@ app.use("/api/customer", customerRouter);
 app.use("/api/services", serviceRouter);
 
 app.use("/api/feedback", feedbackRouter);
+
+app.use("/api/notifications", notificationRouter);
 
 server.listen(port, async () => {
   try {
@@ -122,6 +129,14 @@ io.on("connection", (socket) => {
       }
     }
   );
+
+  socket.on("sendFeedback", () => {
+    io.emit("feedbackReceived");
+  });
+
+  socket.on("addService", () => {
+    io.emit("serviceAdded");
+  })
 });
 
 function sendResponse(response, callback) {

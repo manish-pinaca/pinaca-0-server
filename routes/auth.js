@@ -4,7 +4,7 @@ const {
   register,
   login,
   getUserData,
-  downloadReport,
+  // downloadReport,
   getReports,
 } = require("../controllers/auth.controller");
 
@@ -16,7 +16,7 @@ authRouter.post("/login", login);
 
 authRouter.get("/:role/:userId", getUserData);
 
-authRouter.get("/reports/download/:customerId/:serviceId", downloadReport);
+// authRouter.get("/reports/download/:customerId/:serviceId", downloadReport);
 
 authRouter.get("/reports/get/:customerId/:serviceId", getReports);
 
