@@ -248,13 +248,29 @@ module.exports.removePendingService = async (customerId, serviceId) => {
   }
 };
 
-module.exports.addActiveService = async (customerId, serviceId) => {
+module.exports.addActiveService = async (customerId, serviceId, adminId) => {
   try {
     const customer = await Customer.findById(customerId);
+
+    const user = await User.findById(adminId, { password: 0, __v: 0 });
 
     const service = await Service.findById(serviceId);
 
     const acceptTime = new Date().toUTCString();
+
+    const newNotification = new NotificationModel({
+      message: `${user.name} has added ${service.service} to your account.`,
+      type: "ADD_SERVICE",
+      sendBy: adminId,
+      sendTo: [
+        {
+          receiverId: customerId,
+          seen: false,
+        },
+      ],
+    });
+
+    await newNotification.save();
 
     customer.activeServices.push({
       serviceId,
@@ -268,17 +284,33 @@ module.exports.addActiveService = async (customerId, serviceId) => {
   }
 };
 
-module.exports.addRejectedService = async (customerId, serviceId) => {
+module.exports.addRejectedService = async (customerId, serviceId, adminId) => {
   try {
     const customer = await Customer.findById(customerId);
 
     const service = await Service.findById(serviceId);
+
+    const admin = await User.findById(adminId);
 
     customer.rejectedServices.push({
       serviceId,
       serviceName: service.service,
       rejectedOn: new Date().toUTCString(),
     });
+
+    const newNotification = new NotificationModel({
+      message: `${admin.name} has rejected activation of ${service.service}.`,
+      type: "REMOVE_SERVICE_REQUEST",
+      sendBy: adminId,
+      sendTo: [
+        {
+          receiverId: customerId,
+          seen: false,
+        },
+      ],
+    });
+
+    await newNotification.save();
 
     return await Customer.findByIdAndUpdate(customerId, customer);
   } catch (error) {

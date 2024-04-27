@@ -1,4 +1,6 @@
 const Customer = require("../models/Customer.model");
+const NotificationModel = require("../models/Notification.model");
+const UserModel = require("../models/User.model");
 const AWS = require("aws-sdk");
 const fs = require("fs");
 
@@ -99,7 +101,7 @@ module.exports.getCustomerName = async (req, res) => {
 
 module.exports.uploadReport = async (req, res) => {
   const { customerId } = req.params;
-  const { serviceId, serviceName, generatedOn } = req.body;
+  const { serviceId, serviceName, generatedOn, adminId } = req.body;
 
   try {
     const file = req.file;
@@ -109,6 +111,35 @@ module.exports.uploadReport = async (req, res) => {
         success: false,
         error: "You must upload a file",
       });
+    }
+
+    const customer = await Customer.findById(customerId, {
+      password: 0,
+      __v: 0,
+    });
+
+    const user = await UserModel.findById(adminId, { password: 0, __v: 0 });
+
+    if (
+      !customer.activeServices.find(
+        (service) => service.serviceId === serviceId
+      )
+    ) {
+      customer.activeServices.push({
+        serviceId: serviceId,
+        serviceName: serviceName,
+        activateOn: new Date().toUTCString(),
+      });
+    }
+
+    if (
+      customer.pendingServices.find(
+        (service) => service.serviceId === serviceId
+      )
+    ) {
+      customer.pendingServices = customer.pendingServices.filter(
+        (service) => service.serviceId !== serviceId
+      );
     }
 
     const fileStream = fs.createReadStream(file.path);
@@ -131,11 +162,6 @@ module.exports.uploadReport = async (req, res) => {
       fs.unlinkSync(file.path);
       console.log("File uploaded successfully");
 
-      const customer = await Customer.findById(customerId, {
-        password: 0,
-        __v: 0,
-      });
-
       if (!customer.reports) customer.reports = [];
 
       customer.reports.push({
@@ -145,6 +171,25 @@ module.exports.uploadReport = async (req, res) => {
         awsReportKey: data.Key,
       });
 
+      const newNotification = new NotificationModel({
+        message: `${user.name} has added a new service ${serviceName} to your account.`,
+        type: "ADD_SERVICE",
+        sendBy: adminId,
+        sendTo: [{ receiverId: customerId, seen: false }],
+      });
+      
+      if (
+        user.requestedServices.find(
+          (service) => service.serviceId === serviceId
+        )
+      ) {
+        user.requestedServices = user.requestedServices.filter(
+          (service) => service.serviceId !== serviceId
+        );
+        await UserModel.findByIdAndUpdate(adminId, user);
+      }
+
+      await newNotification.save();
       await Customer.findByIdAndUpdate(customerId, customer);
       return res.status(200).json({ message: "Report uploaded successfully" });
     });

@@ -20,17 +20,18 @@ module.exports.getAll = async (req, res) => {
   try {
     const { page, limit } = req.query;
 
+    const totalServices = await ServiceModel.find().count();
+
     if (!(page && limit)) {
       const services = await ServiceModel.find({}, { __v: 0 });
 
-      return res.status(200).json({ services });
+      return res.status(200).json({ services, totalServices });
     }
 
-    const services = await ServiceModel.find()
+    const services = await ServiceModel.find({}, { __v: 0 })
       .skip((page - 1) * limit)
       .limit(limit);
 
-    const totalServices = await ServiceModel.find().count();
 
     return res
       .status(200)
@@ -102,5 +103,46 @@ module.exports.getAllServicesFilterByCustomerId = async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Error getting services" });
+  }
+};
+
+module.exports.getAllServicesFilterByStatus = async (req, res) => {
+  const { status } = req.params;
+
+  const { page, limit } = req.query;
+
+  try {
+    if (!(page && limit)) {
+      const services = await ServiceModel.find({ status }, { __v: 0 });
+
+      return res.status(200).json({ services });
+    }
+
+    const services = await ServiceModel.find({ status })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const totalServices = await ServiceModel.find({ status }).count();
+
+    return res
+      .status(200)
+      .json({ services, page: Number(page), totalServices });
+  } catch (error) {
+    return res.status(500).json({ error: "Error getting services" });
+  }
+};
+
+module.exports.changeServiceStatus = async (req, res) => {
+  const { serviceId, status } = req.params;
+
+  try {
+    await ServiceModel.findOneAndUpdate(
+      { _id: serviceId },
+      { $set: { status } }
+    );
+
+    return res.json({ message: "Service status changed successfully" });
+  } catch (error) {
+    return res.status(500).json({ error: "Error updating service status" });
   }
 };

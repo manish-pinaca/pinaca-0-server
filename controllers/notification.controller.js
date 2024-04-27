@@ -9,9 +9,17 @@ module.exports.fetchNotifications = async (req, res) => {
       "sendTo.seen": false,
     }).sort({ createdAt: -1 });
 
-    console.log("Notifications:", notifications);
+    const data = [];
 
-    return res.status(200).json({ notifications });
+    notifications.forEach(notification => {
+      notification.sendTo.forEach(receiver => {
+        if (receiver.receiverId === userId && receiver.seen === false) {
+          data.push(notification);
+        }
+      })
+    })
+
+    return res.status(200).json({ notifications: data });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Error getting notifications" });
@@ -20,6 +28,8 @@ module.exports.fetchNotifications = async (req, res) => {
 
 module.exports.markAsRead = async (req, res) => {
   const { notificationId, receiverId } = req.params;
+
+  console.log("Mark as read:", receiverId);
 
   try {
     const notification = await NotificationModel.findById(notificationId);

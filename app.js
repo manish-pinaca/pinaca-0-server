@@ -98,7 +98,7 @@ io.on("connection", (socket) => {
       console.log(`Accept service request for ${serviceId} by ${customerId}`);
       try {
         await removePendingService(customerId, serviceId);
-        await addActiveService(customerId, serviceId);
+        await addActiveService(customerId, serviceId, adminId);
         await removeRequestedService(customerId, serviceId, adminId);
 
         io.emit("accepted-request", { customerId, serviceId });
@@ -117,7 +117,7 @@ io.on("connection", (socket) => {
       console.log(`Accept service request for ${serviceId} by ${customerId}`);
       try {
         await removePendingService(customerId, serviceId);
-        await addRejectedService(customerId, serviceId);
+        await addRejectedService(customerId, serviceId, adminId);
         await removeRequestedService(customerId, serviceId, adminId);
 
         io.emit("rejected-request", { customerId, serviceId });
@@ -136,7 +136,11 @@ io.on("connection", (socket) => {
 
   socket.on("addService", () => {
     io.emit("serviceAdded");
-  })
+  });
+
+  socket.on("changeServiceStatus", () => {
+    io.emit("serviceStatusChanged");
+  });
 });
 
 function sendResponse(response, callback) {
