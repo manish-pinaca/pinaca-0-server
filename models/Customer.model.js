@@ -40,6 +40,7 @@ const customerSchema = new Schema({
       serviceName: { type: String },
       generatedOn: { type: String },
       awsReportKey: { type: String },
+      filename: { type: String },
     },
   ],
 });

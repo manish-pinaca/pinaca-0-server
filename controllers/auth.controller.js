@@ -526,7 +526,8 @@ module.exports.getReports = async (req, res) => {
           serviceId: report.serviceId,
           serviceName: report.serviceName,
           generatedOn: report.generatedOn,
-          awsReportKey: report.awsReportKey,
+          // awsReportKey: report.awsReportKey,
+          filename: report.filename,
         };
       });
 
@@ -556,7 +557,8 @@ module.exports.getReports = async (req, res) => {
               customerName: customer.customerName,
               serviceId: report.serviceId,
               serviceName: report.serviceName,
-              awsReportKey: report.awsReportKey,
+              // awsReportKey: report.awsReportKey,
+              filename: report.filename,
               generatedOn: report.generatedOn,
             });
         });
@@ -578,7 +580,8 @@ module.exports.getReports = async (req, res) => {
           serviceId: report.serviceId,
           serviceName: report.serviceName,
           generatedOn: report.generatedOn,
-          awsReportKey: report.awsReportKey,
+          // awsReportKey: report.awsReportKey,
+          filename: report.filename,
         };
       });
 
@@ -595,7 +598,8 @@ module.exports.getReports = async (req, res) => {
             customerName: customer.customerName,
             serviceId: report.serviceId,
             serviceName: report.serviceName,
-            awsReportKey: report.awsReportKey,
+            // awsReportKey: report.awsReportKey,
+            filename: report.filename,
             generatedOn: report.generatedOn,
           });
         });

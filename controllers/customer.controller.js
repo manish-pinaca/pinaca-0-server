@@ -142,6 +142,8 @@ module.exports.uploadReport = async (req, res) => {
       );
     }
 
+    // comment below code for later reference
+    /*
     const fileStream = fs.createReadStream(file.path);
 
     const params = {
@@ -169,6 +171,7 @@ module.exports.uploadReport = async (req, res) => {
         serviceName: serviceName,
         generatedOn: generatedOn,
         awsReportKey: data.Key,
+        filename: file.filename
       });
 
       const newNotification = new NotificationModel({
@@ -177,7 +180,7 @@ module.exports.uploadReport = async (req, res) => {
         sendBy: adminId,
         sendTo: [{ receiverId: customerId, seen: false }],
       });
-      
+
       if (
         user.requestedServices.find(
           (service) => service.serviceId === serviceId
@@ -190,9 +193,44 @@ module.exports.uploadReport = async (req, res) => {
       }
 
       await newNotification.save();
+
       await Customer.findByIdAndUpdate(customerId, customer);
+
       return res.status(200).json({ message: "Report uploaded successfully" });
     });
+    */
+
+    if (!customer.reports) customer.reports = [];
+
+    customer.reports.push({
+      serviceId: serviceId,
+      serviceName: serviceName,
+      generatedOn: generatedOn,
+      // awsReportKey: data.Key,
+      filename: file.filename,
+    });
+
+    const newNotification = new NotificationModel({
+      message: `${user.name} has added a new service ${serviceName} to your account.`,
+      type: "ADD_SERVICE",
+      sendBy: adminId,
+      sendTo: [{ receiverId: customerId, seen: false }],
+    });
+
+    if (
+      user.requestedServices.find((service) => service.serviceId === serviceId)
+    ) {
+      user.requestedServices = user.requestedServices.filter(
+        (service) => service.serviceId !== serviceId
+      );
+      await UserModel.findByIdAndUpdate(adminId, user);
+    }
+
+    await newNotification.save();
+
+    await Customer.findByIdAndUpdate(customerId, customer);
+
+    return res.status(200).json({ message: "Report uploaded successfully" });
   } catch (error) {
     console.log("[ERROR]:", error);
     return res.status(500).json({ message: "Error uploading reports" });
@@ -217,14 +255,32 @@ function uploadFileToS3(file) {
 }
 
 module.exports.downloadReport = async (req, res) => {
-  const { reportKey } = req.params;
+  const { filename } = req.params;
 
   try {
+    // comment below code for later reference
+    /*
     const data = await s3
       .getObject({ Bucket: bucketName, Key: reportKey })
       .promise();
 
     res.send(data.Body);
+    */
+
+    if (!filename) {
+      return res.status(400).send("filename is required.");
+    }
+
+    fs.access("uploads/" + filename, fs.constants.F_OK, (err) => {
+      if (err) {
+        return res.status(404).send("File not found.");
+      }
+
+      // Read the file and send it as a blob
+      const file = fs.readFileSync("uploads/" + filename);
+
+      return res.send(file);
+    });
   } catch (error) {
     console.error("Error fetching file from S3:", error);
     res.status(500).send("Failed to download file");

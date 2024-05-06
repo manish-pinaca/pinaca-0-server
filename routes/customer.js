@@ -23,7 +23,7 @@ router.get("/getCustomerName/:customerId", getCustomerName);
 
 router.patch("/uploadReport/:customerId", uploadMiddleware, uploadReport);
 
-router.get("/reports/download/:reportKey", downloadReport);
+router.get("/reports/download/:filename", downloadReport);
 
 router.get("/getAllCustomersFilterByServiceId/:serviceId", getAllCustomersFilterByServiceId);
 
