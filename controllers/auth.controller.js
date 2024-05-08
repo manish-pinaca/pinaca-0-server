@@ -611,3 +611,29 @@ module.exports.getReports = async (req, res) => {
     return res.status(500).json({ message: "Something went wrong" });
   }
 };
+
+module.exports.changePassword = async (req, res) => {
+  const { userType, userId } = req.params;
+  const { password } = req.body;
+
+  try {
+    const salt = bcrypt.genSaltSync(10);
+
+    // Hash password
+    const hashedPassword = bcrypt.hashSync(password, salt);
+
+    if (userType === "admin") {
+      await User.findByIdAndUpdate(userId, {
+        $set: { password: hashedPassword },
+      });
+    } else {
+      await Customer.findByIdAndUpdate(userId, {
+        $set: { password: hashedPassword },
+      });
+    }
+
+    return res.status(200).json({ message: "Password changed successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Something went wrong" });
+  }
+};
